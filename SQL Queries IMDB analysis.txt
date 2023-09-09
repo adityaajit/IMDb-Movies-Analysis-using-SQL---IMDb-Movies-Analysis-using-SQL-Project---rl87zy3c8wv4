@@ -1,0 +1,563 @@
+1. Find the total number of rows in each table of the schema.
+
+SELECT table_name, table_rows
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA = 'movie_analysis'
+
+2. Identify which columns in the movie table have null values.
+
+--
+UPDATE movie_db 
+SET 
+    id = NULLIF(id, ''),
+    title = NULLIF(title, ''),
+    year = NULLIF(year, ''),
+    date_published = NULLIF(date_published, ''),
+    duration = NULLIF(duration, ''),
+    country = NULLIF(country, ''),
+    worlwide_gross_income = NULLIF(worlwide_gross_income, ''),
+    languages = NULLIF(languages, ''),
+    production_company = NULLIF(production_company, '')
+WHERE
+    ID = '' OR title = '' OR year = ''
+        OR date_published = ''
+        OR duration = ''
+        OR country = ''
+        OR worlwide_gross_income = ''
+        OR languages = ''
+        OR production_company = ''
+
+--converting empty spaces in a table to null value
+
+SELECT 
+		SUM(CASE WHEN id IS NULL THEN 1 ELSE 0 END) AS ID_nulls, 
+		SUM(CASE WHEN title IS NULL THEN 1 ELSE 0 END) AS title_nulls, 
+		SUM(CASE WHEN year IS NULL THEN 1 ELSE 0 END) AS year_nulls,
+		SUM(CASE WHEN date_published IS NULL THEN 1 ELSE 0 END) AS date_published_nulls,
+		SUM(CASE WHEN duration IS NULL THEN 1 ELSE 0 END) AS duration_nulls,
+		SUM(CASE WHEN country IS NULL THEN 1 ELSE 0 END) AS country_nulls,
+		SUM(CASE WHEN worlwide_gross_income IS NULL THEN 1 ELSE 0 END) AS worlwide_gross_income_nulls,
+		SUM(CASE WHEN languages IS NULL THEN 1 ELSE 0 END) AS languages_nulls,
+		SUM(CASE WHEN production_company IS NULL THEN 1 ELSE 0 END) AS production_company_nulls
+
+FROM movie_db;
+
+Segment II: Movie Release Trends
+1. Determine the total number of movies released each year and analyse the month-wise trend.
+-- created new column Month
+ALTER TABLE movie_db
+ADD COLUMN Month INT;
+
+--Retrive month from date
+UPDATE movie_db
+SET Month = MONTH(STR_TO_DATE(date_published, '%d-%m-%Y'));
+
+--movies released each year and month wise
+select year,month, count(ID) as movie_count from movie_db
+group by year, month
+order by year, month
+
+--Monthwise trend
+select month, count(ID) as movie_count from movie_db
+group by month
+order by month
+
+
+2.Calculate the number of movies produced in the USA or India in the year 2019.
+
+SELECT  year, COUNT(id) AS number_of_movies
+FROM movie
+WHERE country = 'USA' OR country = 'India'
+GROUP BY country
+HAVING year=2019;
+
+
+
+Segment III: Production Statistics and Genre Analysis
+
+1. Retrieve the unique list of genres present in the dataset.
+SELECT DISTINCT genre
+FROM genre;
+
+2. Identify the genre with the highest number of movies produced overall.
+SELECT 
+    genre, COUNT(genre) AS num
+FROM
+    genre
+GROUP BY genre
+ORDER BY num DESC
+LIMIT 1
+
+3. Determine the count of movies that belong to only one genre.
+SELECT 
+    genre, COUNT(genre)
+FROM
+    genre
+GROUP BY genre
+
+4. Calculate the average duration of movies in each genre.
+
+SELECT 
+    genre, AVG(duration) AS avg_dur
+FROM
+    genre AS g
+        INNER JOIN
+    movie_2 AS m ON g.id = m.id
+GROUP BY genre
+ORDER BY AVG(duration) DESC;
+
+output:
+Thriller	103.8558
+Sci-Fi	97.7173
+Romance	111.7649
+Others	99.2500
+Mystery	101.6468
+Horror	95.7409
+Fantasy	104.9327
+Family	99.3212
+Drama	109.0373
+Crime	108.4317
+Comedy	103.2906
+Adventure	101.4704
+Action	115.5012
+
+5. Find the rank of the 'thriller' genre among all genres in terms of the number of movies produced.
+
+with a1 as 
+(select count(m.id) as num_of_movies, 
+	g.genre, 
+	ROW_NUMBER() OVER(ORDER BY count(id) desc) Rank_of_movie 
+from genre as g 
+join movie_2 as m 
+where m.id = g.id 
+group by g.genre 
+order by num_of_movies desc)
+select * from a1 where genre = "Thriller"
+
+output:
+
+1484	Thriller	3
+
+-First place for Drama(4285) and second place to Comedy(2412)
+
+
+Segment IV: Ratings Analysis and Crew Members
+
+1. Retrieve the minimum and maximum values in each column of the ratings table (except movie_id).
+
+SELECT MIN(avg_rating) AS min_avg_rating, 
+		MAX(avg_rating) AS max_avg_rating,
+		MIN(total_votes) AS min_total_votes, 
+        MAX(total_votes) AS max_total_votes,
+		MIN(median_rating) AS min_median_rating, 
+        MAX(median_rating) AS max_median_rating
+        
+FROM ratings;
+
+output:
+
+min_avg_rating	max_avg_rating	min_total_votes	max_total_votes	min_median_rating	max_median_rating
+1		10		100		725138		1			10
+
+
+2. Identify the top 10 movies based on average rating.
+
+
+with a1 as
+(select avg(avg_rating) as total_avg, 
+movie_id from ratings group by movie_id order by total_avg desc limit 10) 
+ select id, title, year, date_published, duration, country,
+ worlwide_gross_income, languages,production_company, a1. total_avg 
+ from movie_2,a1 where id = a1.movie_id
+order by a1.total_avg desc
+
+output:
+
+
+id		title				year	date_published	duration	country		worlwide_gross_income	languages	production_company	total_avg
+tt10914342	Kirket				2019	0000-00-00	132		India					Hindi		A square productions	10
+tt6735740	Love in Kilnerry		2019	0000-00-00	100		USA					English		Archway Pictures	10
+tt9537008	Gini Helida Kathe		2019	0000-00-00	138		India					Kannada					9.8
+tt10370434	Runam				2019	0000-00-00	131		India					Telugu		Bestwin Production	9.7
+tt10867504	Fan				2019	0000-00-00	145		India					Kannada		SLN Cinemas		9.6
+tt9526826	Android Kunjappan Version 5.25	2019	0000-00-00	140		India					Malayalam	Moonshot Entertainments	9.6
+tt10869474	Safe				2019	0000-00-00	144		India					Malayalam	Epiphany Entertainments	9.5
+tt10901588	The Brighton Miracle		2019	0000-00-00	82		Australia				English		Eastpool Films		9.5
+tt9680166	Yeh Suhaagraat Impossible	2019	0000-00-00	92		India					Hindi		Piecewing Productions	9.5
+tt10405902	Shibu				2019	0000-00-00	145		India					Malayalam	Kaargo Cinemas		9.4
+
+3. Summarise the ratings table based on movie counts by median ratings.
+
+SELECT median_rating, COUNT(movie_id) AS movie_count
+FROM ratings
+GROUP BY median_rating
+ORDER BY median_rating;
+
+output:
+
+median_rating	movie_count
+1		94
+2		119
+3		283
+4		479
+5		985
+6		1975
+7		2257
+8		1030
+9		429
+10		346
+
+
+4. Identify the production house that has produced the most number of hit movies (average rating > 8).
+
+with a1 as
+(select id,title,year,date_published,duration,country,languages,production_company,r.avg_rating as rating from movie_2 m
+join ratings r on  m.id = r.movie_id where avg_rating > 8)
+select production_company, round(sum(rating),2), DENSE_RANK() OVER(ORDER BY COUNT(id) DESC) as Production_rank  from a1 
+group by production_company order by Production_rank
+
+
+output:
+
+production_company	sum(rating)	Production_rank
+			155.6		1
+Russian""		33.8		2
+Hindi"""""		34.2		2
+Spanish""		33.4		2
+English"""""		33.7		2
+English			26.1		3
+"National Theatre Live	25.5		3
+
+-- name of the first production company is unknown
+
+5. Determine the number of movies released in each genre during March 2017 in the USA with more than 1,000 votes.
+
+SELECT g.genre, COUNT(g.id) AS movie_count
+FROM genre AS g
+INNER JOIN ratings AS r
+ON g.id = r.movie_id
+INNER JOIN movie_2 AS m
+ON m.id = g.id
+WHERE m.country='USA' AND r.total_votes>1000  AND year=2017
+GROUP BY g.genre
+ORDER BY movie_count DESC;
+
+output:
+
+genre		movie_count
+Drama		172
+Comedy		103
+Horror		88
+Thriller	78
+Action		58
+Crime		55
+Romance		42
+Adventure	32
+Mystery		28
+Sci-Fi		25
+Fantasy		15
+Family		4
+Others		1
+
+
+6. Retrieve movies of each genre starting with the word 'The' and having an average rating > 8
+
+SELECT g.genre as genre, r.avg_rating, m.title as title
+FROM genre AS g
+INNER JOIN ratings AS r
+ON g.id = r.movie_id
+INNER JOIN movie_2 AS m
+ON m.id = g.id
+WHERE r.avg_rating > 8 and title LIKE 'The%'
+order by genre
+
+
+output:
+
+genre	avg_rating	title
+Action	8.3	Theeran Adhigaaram Ondru
+Crime	8.7	The Irishman
+Crime	8.3	Theeran Adhigaaram Ondru
+Crime	8.4	The Gambinos
+Drama	8.8	The Blue Elephant 2
+Drama	9.5	The Brighton Miracle
+Drama	8.7	The Irishman
+Drama	9.1	The Colour of Darkness
+Drama	8.5	The Mystery of Godliness: The Sequel
+Drama	8.4	The Gambinos
+Drama	8.2	The King and I
+Horror	8.8	The Blue Elephant 2
+Mystery	8.8	The Blue Elephant 2
+Romance	8.2	The King and I
+Thriller	8.3	Theeran Adhigaaram Ondru
+
+
+Segment V: Crew Analysis
+
+1. Identify the columns in the names table that have null values.
+
+SELECT COLUMN_NAME
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'names'
+  AND IS_NULLABLE = 'YES'
+
+output:
+
+COLUMN_NAME
+
+height
+date_of_birth
+known_for_movies
+
+2. Determine the top three directors in the top three genres with movies having an average rating > 8
+
+
+with a1 as(select m.id, m.title, g.genre as genre, r.avg_rating from movie_2 m 
+inner join genre g on m.id = g.id
+inner join ratings r on r.movie_id = m.id 
+where r.avg_rating > 8)
+select genre, count(genre) as genre_val from a1 group by genre 
+order by genre_val desc limit 3
+
+I found out 3 best geners only
+
+genre	genre_val
+Drama	175
+Action	46
+Comedy	44
+
+
+
+3. Find the top two actors whose movies have a median rating >= 8.
+
+with a1 as
+(select r.movie_id, 
+r.category as cat, 
+rat.median_rating as med,
+n.name as act 
+from names n join role_mapping r 
+on n.id = r.name_id join ratings rat on rat.movie_id = r.movie_id 
+where rat.median_rating >= 8 order by med)
+select a1.act, 
+sum(med) as score 
+from a1 
+group by a1.act 
+order by sum(med) desc limit 2
+
+output:
+
+actor		score
+Mammootty	74
+Eric Roberts	27
+
+
+4. Identify the top three production houses based on the number of votes received by their movies
+
+SELECT production_company, SUM(total_votes) AS vote_count,
+		DENSE_RANK() OVER(ORDER BY SUM(total_votes) DESC) AS prod_comp_rank
+FROM movie_2 AS m
+INNER JOIN ratings AS r
+ON m.id = r.movie_id
+GROUP BY production_company
+LIMIT 3; 
+
+output:
+
+production_company	vote_count	prod_comp_rank
+English			7445039		1
+English"		6865235		2
+" Spanish"		3757191,	3
+
+
+5. Rank actors based on their average ratings in Indian movies released in India.
+
+with a2 as(
+with a1 as(
+select movie_id as m_id, 
+avg_rating,
+ROW_NUMBER() OVER(ORDER BY avg_rating ) AS best_actor
+ from ratings where movie_id in(
+select id from movie_2 where country like "India"
+))
+select name_id, 
+a1.best_actor as bst_actor from role_mapping, 
+a1 where movie_id = a1.m_id order by best_actor)
+select a2.bst_actor, name from names, a2 where id = a2.name_id 
+order by a2.bst_actor desc
+
+output:
+
+bst_actor	name
+965	Madhavan
+951	Ajith Kumar
+944	Tabu
+918	Hrithik Roshan
+899	Mammootty
+873	Nassar
+863	Amitabh Bachchan
+849	Mammootty
+823	Mammootty
+797	Tanikella Bharani
+795	Nassar
+788	Tanikella Bharani
+759	Juhi Chawla
+694	Nassar
+
+
+6. Identify the top five actresses in Hindi movies released in India based on their average ratings.
+
+with a1 as
+(select m.id,r.name_id, r.category, rat.avg_rating, n.name from movie_2 m 
+join role_mapping r on r.movie_id = m.id 
+join ratings rat on rat.movie_id = m.id
+join names n on n.id = r.name_id
+where m.languages like 'Hindi' and m.country like 'India' and category like 'actress'
+order by avg_rating desc
+limit 5)
+select name from a1
+
+output:
+
+name
+Urmila Matondkar
+Sonali Kulkarni
+Preity Zinta
+Madhuri Dixit
+Rati Agnihotri
+
+
+
+
+
+Segment VI: Broader Understanding of Data
+
+1. Classify thriller movies based on average ratings into different categories.
+
+WITH thriller_movies
+     AS (SELECT DISTINCT title,
+                         avg_rating
+         FROM   movie_2 AS M
+                INNER JOIN ratings AS R
+                        ON R.movie_id = M.id
+                INNER JOIN genre AS G using(id)
+         WHERE  genre LIKE 'THRILLER')
+SELECT *,
+       CASE
+         WHEN avg_rating > 8 THEN 'Superhit movies'
+         WHEN avg_rating BETWEEN 7 AND 8 THEN 'Hit movies'
+         WHEN avg_rating BETWEEN 5 AND 7 THEN 'One-time-watch movies'
+         ELSE 'Flop movies'
+       END AS avg_rating_category
+FROM   thriller_movies;
+
+output:
+
+
+title		avg_rating	avg_rating_category
+Der mÃ¼de Tod	7.7		Hit movies
+Fahrenheit 451	4.9		Flop movies
+Pet Sematary	5.8		One-time-watch movies
+Dukun		6.9		One-time-watch movies
+Back Roads	7		Hit movies
+Countdown	5.4		One-time-watch movies
+Staged Killer	3.3		Flop movies
+Vellaipookal	7.3		Hit movies
+Uriyadi 2	7.3		Hit movies
+Incitement	7.5		Hit movies
+Rakshasudu	8.4		Superhit movies
+Trois jours et une vie	6.6	One-time-watch movies
+Killer in Law	5.1		One-time-watch movies
+Kalki		7.3		Hit movies
+Milliard	2.7		Flop movies
+Vinci Da	7.2		Hit movies
+Gunned Down	5.1		One-time-watch movies
+
+
+2. Analyse the genre-wise running total and moving average of the average movie duration
+
+SELECT genre, ROUND(AVG(duration),2) AS avg_duration,
+SUM(ROUND(AVG(duration),2)) OVER(ORDER BY genre ROWS UNBOUNDED PRECEDING) AS running_total_duration,
+        AVG(ROUND(AVG(duration),2)) OVER(ORDER BY genre ROWS 10 PRECEDING) AS moving_avg_duration
+FROM movie_2 AS m 
+INNER JOIN genre AS g 
+ON m.id= g.id
+GROUP BY genre
+ORDER BY genre;
+
+
+output:
+
+
+genre	avg_duration	running_total_duration	moving_avg_duration
+Action	115.5		115.5			115.5
+Adventure101.47		216.97			108.485
+Comedy	103.29		320.26			106.753333
+Crime	108.43		428.69			107.1725
+Drama	109.04		537.73			107.546
+Family	99.32		637.05			106.175
+Fantasy	104.93		741.98			105.997143
+Horror	95.74		837.72			104.715
+Mystery	101.65		939.37			104.374444
+Others	99.25		1038.62			103.862
+Romance	111.76		1150.38			104.58
+Sci-Fi	97.72		1248.1			102.963636
+Thriller103.86		1351.96	
+
+
+3. Identify the five highest-grossing movies of each year that belong to the top three genres.
+
+
+
+
+
+4. Identify the top three actresses based on the number of Super Hit movies (average rating > 8) in the drama genre.
+
+with a1 as(select role.movie_id, role.name_id, n.name, g.genre, r.avg_rating from role_mapping role
+join names n on n.id = role.name_id
+join genre g on g.id = role.movie_id
+join ratings r on r.movie_id = role.movie_id
+where r.avg_rating > 8 and genre like 'drama'
+order by avg_rating desc)
+select name  from a1 group by name 
+order by sum(avg_rating)  desc
+limit 3
+
+output:
+
+name
+Nathan Lane
+Mark Arnold
+Danny Glover
+
+
+
+
+
+
+5. Retrieve details for the top nine directors based on the number of movies, including average inter-movie duration, ratings, and more
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
